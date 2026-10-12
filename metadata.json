@@ -1,0 +1,6 @@
+{
+  "name": "Nông Sản Bình Mỹ",
+  "description": "Sàn đặt trước nông sản kết nối trực tiếp nông hộ xã Bình Mỹ với người tiêu dùng theo phiên thu hoạch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

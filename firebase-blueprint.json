@@ -1,0 +1,173 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account in Bình Mỹ Agri platform with RBAC role and scope bindings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "roleId": {
+          "type": "string",
+          "enum": ["ROLE_CUSTOMER", "ROLE_FARMER", "ROLE_STATION_MANAGER", "ROLE_HTX_ADMIN", "ROLE_SUPER_ADMIN"]
+        },
+        "farmerId": { "type": "string", "description": "Associated farmer ID for FARMER role" },
+        "stationId": { "type": "string", "description": "Assigned distribution station ID for STATION_MANAGER role" },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "roleId", "status", "createdAt"]
+    },
+    "Role": {
+      "title": "RBAC Role Definition",
+      "description": "Role metadata and allowed global permissions",
+      "type": "object",
+      "properties": {
+        "roleId": { "type": "string" },
+        "roleName": { "type": "string" },
+        "description": { "type": "string" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "dataScopeType": {
+          "type": "string",
+          "enum": ["ALL", "FARMER_OWN", "STATION_OWN", "CUSTOMER_OWN", "NONE"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roleId", "roleName", "permissions", "dataScopeType"]
+    },
+    "Permission": {
+      "title": "RBAC Permission Definition",
+      "description": "Granular action permissions",
+      "type": "object",
+      "properties": {
+        "permissionId": { "type": "string" },
+        "module": { "type": "string" },
+        "action": { "type": "string" },
+        "scope": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["permissionId", "module", "action", "scope"]
+    },
+    "Product": {
+      "title": "Agricultural Product",
+      "description": "Produce items supplied by farmers",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "farmerId": { "type": "string", "description": "Owner farmer ID for data scoping" },
+        "farmerName": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "floorPrice": { "type": "number" },
+        "ceilingPrice": { "type": "number" },
+        "stockQuantity": { "type": "integer" },
+        "unit": { "type": "string" },
+        "harvestDate": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["DRAFT", "ACTIVE", "OUT_OF_STOCK", "ARCHIVED"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "farmerId", "name", "price", "stockQuantity", "unit", "status", "createdAt"]
+    },
+    "Order": {
+      "title": "Agricultural Supply Order",
+      "description": "Transactional order document containing customer_id, farmer_ids, and station_id scope fields",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "customerId": { "type": "string", "description": "Scope field: Customer who placed order" },
+        "farmerIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Scope field: Array of farmer IDs involved in this order"
+        },
+        "stationId": { "type": "string", "description": "Scope field: Station ID assigned to deliver/transit this order" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "deliveryStationName": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": ["PLACED", "PROCESSING", "RECEIVED_AT_STATION", "DELIVERED", "COMPLETED", "CANCELLED"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "customerId", "farmerIds", "stationId", "totalAmount", "status", "createdAt"]
+    },
+    "DistributionStation": {
+      "title": "Regional Distribution Station",
+      "description": "Transit point managed by Station Manager",
+      "type": "object",
+      "properties": {
+        "stationId": { "type": "string" },
+        "stationName": { "type": "string" },
+        "managerId": { "type": "string" },
+        "managerName": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["stationId", "stationName", "managerId", "address", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "Audit Trail Log",
+      "description": "Super Admin and HTX operational log",
+      "type": "object",
+      "properties": {
+        "logId": { "type": "string" },
+        "operatorUid": { "type": "string" },
+        "operatorRole": { "type": "string" },
+        "action": { "type": "string" },
+        "targetPath": { "type": "string" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["logId", "operatorUid", "operatorRole", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile with RBAC role and scope identifiers"
+    },
+    "/roles/{roleId}": {
+      "schema": { "$ref": "#/entities/Role" },
+      "description": "5 RBAC roles definitions"
+    },
+    "/permissions/{permissionId}": {
+      "schema": { "$ref": "#/entities/Permission" },
+      "description": "Granular system permission definitions"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Farmer produce listings"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "D2C agricultural orders with customer_id, farmer_ids, station_id scope bindings"
+    },
+    "/stations/{stationId}": {
+      "schema": { "$ref": "#/entities/DistributionStation" },
+      "description": "Bình Mỹ HTX distribution stations"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Security audit trail logs"
+    }
+  }
+}

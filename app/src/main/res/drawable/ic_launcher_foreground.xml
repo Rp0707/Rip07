@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Basket / bowl base -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,60 C32,73 42,80 54,80 C66,80 76,73 76,60 L32,60 Z" />
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M30,58 L78,58 C79,58 80,59 80,60 C80,61 79,62 78,62 L30,62 C29,62 28,61 28,60 C28,59 29,58 30,58 Z" />
+    <!-- Leaf 1 (Left Rau Muong leaf) -->
+    <path
+        android:fillColor="#C8E6C9"
+        android:pathData="M52,58 C46,48 34,44 32,32 C46,32 54,42 54,58 Z" />
+    <!-- Leaf 2 (Center Sprout / Water spinach stem & leaf) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,58 C50,42 46,26 54,22 C62,26 58,42 54,58 Z" />
+    <!-- Leaf 3 (Right Leaf) -->
+    <path
+        android:fillColor="#A5D6A7"
+        android:pathData="M56,58 C54,42 62,32 76,32 C74,44 62,48 56,58 Z" />
+    <!-- Golden organic sun badge -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M54,48 C51.8,48 50,49.8 50,52 C50,54.2 51.8,56 54,56 C56.2,56 58,54.2 58,52 C58,49.8 56.2,48 54,48 Z" />
+</vector>

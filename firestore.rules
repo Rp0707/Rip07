@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Catch-all Default Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? getUserData().roleId
+        : 'ROLE_CUSTOMER';
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && getUserRole() == 'ROLE_SUPER_ADMIN';
+    }
+
+    function isHtxAdmin() {
+      return isSignedIn() && (getUserRole() == 'ROLE_HTX_ADMIN' || isSuperAdmin());
+    }
+
+    function isStationManager() {
+      return isSignedIn() && (getUserRole() == 'ROLE_STATION_MANAGER' || isHtxAdmin());
+    }
+
+    function isFarmer() {
+      return isSignedIn() && (getUserRole() == 'ROLE_FARMER' || isHtxAdmin());
+    }
+
+    function isCustomer() {
+      return isSignedIn();
+    }
+
+    // -------------------------------------------------------------
+    // USERS COLLECTION (/users/{userId})
+    // -------------------------------------------------------------
+    match /users/{userId} {
+      // Users can view their own profile; Admins can view any user
+      allow get: if isSignedIn() && (request.auth.uid == userId || isHtxAdmin());
+      allow list: if isHtxAdmin();
+
+      // Creation on register
+      allow create: if isSignedIn() && request.auth.uid == userId
+                    && incoming().uid == request.auth.uid
+                    && (incoming().roleId == 'ROLE_CUSTOMER' || isHtxAdmin())
+                    && incoming().createdAt is timestamp;
+
+      // Update self (except role & status escalation which require Super Admin or HTX Admin)
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && incoming().roleId == existing().roleId && incoming().status == existing().status) ||
+        isHtxAdmin()
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // ROLES & PERMISSIONS COLLECTIONS (Read-Only to non-admins)
+    // -------------------------------------------------------------
+    match /roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /permissions/{permissionId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // PRODUCTS COLLECTION (/products/{productId})
+    // -------------------------------------------------------------
+    match /products/{productId} {
+      // Public / Signed-in catalog view
+      allow read: if isSignedIn();
+
+      // Farmers create products with their own farmerId
+      allow create: if isFarmer() && (
+        (getUserRole() == 'ROLE_FARMER' && incoming().farmerId == getUserData().farmerId) ||
+        isHtxAdmin()
+      ) && incoming().createdAt is timestamp;
+
+      // Farmers update their own products (within price policy if set by HTX)
+      allow update: if isFarmer() && (
+        (getUserRole() == 'ROLE_FARMER' && existing().farmerId == getUserData().farmerId && incoming().farmerId == existing().farmerId) ||
+        isHtxAdmin()
+      );
+
+      allow delete: if isHtxAdmin() || (
+        getUserRole() == 'ROLE_FARMER' && existing().farmerId == getUserData().farmerId
+      );
+    }
+
+    // -------------------------------------------------------------
+    // ORDERS COLLECTION (/orders/{orderId})
+    // DATA SCOPE ENFORCEMENT: customerId, farmerIds, stationId
+    // -------------------------------------------------------------
+    match /orders/{orderId} {
+      // GET (Single document read):
+      // - Customer: own customerId
+      // - Farmer: farmerId in farmerIds
+      // - Station Manager: stationId matches manager's assigned stationId
+      // - HTX Admin / Super Admin: full access
+      allow get: if isSignedIn() && (
+        isHtxAdmin() ||
+        (getUserRole() == 'ROLE_CUSTOMER' && existing().customerId == request.auth.uid) ||
+        (getUserRole() == 'ROLE_FARMER' && getUserData().farmerId in existing().farmerIds) ||
+        (getUserRole() == 'ROLE_STATION_MANAGER' && existing().stationId == getUserData().stationId)
+      );
+
+      // LIST (Collection queries): Must match query filter in client
+      allow list: if isSignedIn() && (
+        isHtxAdmin() ||
+        (getUserRole() == 'ROLE_CUSTOMER' && resource.data.customerId == request.auth.uid) ||
+        (getUserRole() == 'ROLE_FARMER' && getUserData().farmerId in resource.data.farmerIds) ||
+        (getUserRole() == 'ROLE_STATION_MANAGER' && resource.data.stationId == getUserData().stationId)
+      );
+
+      // CREATE: Customer creates order for self
+      allow create: if isSignedIn() && incoming().customerId == request.auth.uid
+                    && incoming().createdAt is timestamp;
+
+      // UPDATE: Role-specific status transitions & scope checks
+      allow update: if isSignedIn() && (
+        // HTX / Super Admin full override
+        isHtxAdmin() ||
+
+        // Customer can cancel PLACED order
+        (getUserRole() == 'ROLE_CUSTOMER' && existing().customerId == request.auth.uid
+         && existing().status == 'PLACED' && incoming().status == 'CANCELLED') ||
+
+        // Farmer can update confirmation for orders involving their produce
+        (getUserRole() == 'ROLE_FARMER' && getUserData().farmerId in existing().farmerIds
+         && incoming().diff(existing()).affectedKeys().hasOnly(['farmerConfirmation', 'updatedAt'])) ||
+
+        // Station Manager can update status / receipt for orders routed to their station
+        (getUserRole() == 'ROLE_STATION_MANAGER' && existing().stationId == getUserData().stationId
+         && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'stationReceipt', 'updatedAt']))
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // STATIONS COLLECTION (/stations/{stationId})
+    // -------------------------------------------------------------
+    match /stations/{stationId} {
+      allow read: if isSignedIn();
+      allow write: if isHtxAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // AUDIT LOGS COLLECTION (/audit_logs/{logId})
+    // System audit logs - append-only by system / super admin
+    // -------------------------------------------------------------
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn(); // Log entry creation
+      allow update, delete: if false; // Immutable audit log
+    }
+  }
+}
